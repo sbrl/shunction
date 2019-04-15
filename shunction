@@ -16,6 +16,7 @@ lantern_path="lantern-build-engine";
 ###
 
 config_file="./shunction-settings.sh";
+jobs_folder="./jobs";
 
 ###############################################################################
 
@@ -28,9 +29,12 @@ source "${lantern_path}/lantern.sh";
 
 ###############################################################################
 
-task_trigger() {
-	echo testing;
+# $1	Time to parse
+parse_time() {
+	echo "$1" | tr 'ms' '\t' | awk '{ print(($1*60)+$2) }';
 }
+
+###############################################################################
 
 task_help() {
 	echo -e "${FBLE}${project_name}${RS}";
@@ -42,11 +46,51 @@ task_help() {
 	echo -e "    shunction ${CTOKEN}--help${RS}";
 	echo -e "";
 	echo -e "${CSECTION}Actions${RS}";
-	echo -e "";
+	echo -e "    ${CACTION}trigger${RS} ${CTOKEN}{adhoc|cron} {job_name}";
 	echo -e "";
 	echo -e "${CSECTION}Options${RS}";
 	echo -e "    ${CTOKEN}-c  --config    Specify the configuration file location";
 	echo -e "";
+}
+
+task_trigger() {
+	trigger_type="${extras[1]}"; # adhoc, cron[, inotify, http]
+	job_name="${extras[2]}";
+	if [[ "${trigger_type}" == "" ]]; then
+		echo -e "${FRED}${HC}Error: No trigger type specified.${RS}";
+		exit 3;
+	fi
+	
+	job_filename="${jobs_folder}/${job_name}.job";
+	
+	if [[ ! -f "${job_filename}" ]]; then
+		echo -e "${FRED}${HC}Error: '${job_filename}' doesn't exist.${RS}";
+		exit 5;
+	elif [[ ! -x "${job_filename}" ]]; then
+		echo -e "${FRED}${HC}Error: '${job_filename}' exists, but isn't executable.${RS}";
+		exit 4;
+	fi
+	
+	#######################################################
+	
+	export STN_TIGGER_TYPE="${trigger_type}";
+	
+	# start_time="$(date +%s.%N)";
+	raw_cputime="$(time ( "${job_filename}" ) 2>&1 1>/dev/null)";
+	exit_code="$?";
+	# end_time="$(date +%s.%N)";
+	
+	time_taken_real="$(parse_time "$(echo "${raw_cputime}" | awk '{ print $2 }')")";
+	time_taken_user="$(parse_time "$(echo "${raw_cputime}" | awk '{ print $4 }')")";
+	time_taken_kern="$(parse_time "$(echo "${raw_cputime}" | awk '{ print $6 }')")";
+	
+	# time_taken="$(echo "${end_time} - ${start_time}" | bc)";
+	
+	#######################################################
+	
+	echo -e "[trigger] Executed ${HC}${job_name}${RS} in ${HC}${time_taken_real}${RS}s / (cpu: ${HC}${time_taken_user}${RS}s user, ${HC}${time_taken_kern}${RS}s kernel).";
+	
+	#logger --tag "shunction" --id=$$ "Executed ${job_name} in ${time_taken}ms";
 }
 
 ###############################################################################
@@ -96,7 +140,13 @@ if [[ "${#extras[@]}" -lt 1 ]]; then
 	exit 1;
 fi
 
-echo -e "${LC}[CLI] Action: ${extras[0]}${RS}";
+#echo -e "${LC}[CLI] Action: ${extras[0]}${RS}";
 #tasks_run $1;
+
+if [[ ! -f "${config_file}" ]]; then
+	echo -e "${FRED}${HC}Error: Failed to find config file at '${config_file}'.${RS}";
+fi
+
+source "${config_file}";
 
 tasks_run "${extras[0]}";
