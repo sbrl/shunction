@@ -56,9 +56,19 @@ task_help() {
 task_trigger() {
 	trigger_type="${extras[1]}"; # adhoc, cron[, inotify, http]
 	job_name="${extras[2]}";
+	
+	echo "type ${trigger_type} / job ${job_name}";
 	if [[ "${trigger_type}" == "" ]]; then
 		echo -e "${FRED}${HC}Error: No trigger type specified.${RS}";
+		echo -e "${CSECTION}Actions${RS}";
+		echo -e "    ${CTOKEN}adhoc${RS}      Triggered via cron";
+		echo -e "    ${CTOKEN}cron${RS}       Triggered via cron";
+		echo -e "    ${CTOKEN}inotify${RS}    Triggered via inotify";
+		echo -e "    ${CTOKEN}http${RS}       Triggered via http";
 		exit 3;
+	elif [[ "${job_name}" == "" ]]; then
+		echo -e "${FRED}${HC}Error: No job name specified.";
+		exit 7;
 	fi
 	
 	job_filename="${jobs_folder}/${job_name}.job";
@@ -105,7 +115,7 @@ task_trigger() {
 
 while [[ "${#@}" -gt 0 ]]; do
 	next="${1}";
-	echo -e "${LC}[CLI] Parsing ${next}${RS}";
+	# echo -e "${LC}[CLI] Parsing ${next}${RS}";
 	
 	if [[ "${next}" != -* ]]; then # It doesn't start with a dash
 		# echo -e "${LC}[CLI] Doesn't start with a dash";
@@ -145,6 +155,7 @@ fi
 
 if [[ ! -f "${config_file}" ]]; then
 	echo -e "${FRED}${HC}Error: Failed to find config file at '${config_file}'.${RS}";
+	exit 6;
 fi
 
 source "${config_file}";
