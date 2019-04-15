@@ -1,1 +1,102 @@
 #!/usr/bin/env bash
+# Make sure the current directory is the location of this script to simplify matters
+cd "$(dirname $(readlink -f $0))";
+################
+### Settings ###
+################
+
+# The name of this project
+project_name="shunction";
+
+# The path to the lantern build engine git submodule
+lantern_path="lantern-build-engine";
+
+###
+# Custom Settings
+###
+
+config_file="./shunction-settings.sh";
+
+###############################################################################
+
+# Check out the lantern git submodule if needed
+if [ ! -f "${lantern_path}/lantern.sh" ]; then git submodule update --init "${lantern_path}"; fi
+
+source "${lantern_path}/lantern.sh";
+
+
+
+###############################################################################
+
+task_trigger() {
+	echo testing;
+}
+
+task_help() {
+	echo -e "${FBLE}${project_name}${RS}";
+	echo -e "    by Starbeamrainbowlabs";
+	echo -e "${LC}Powered by the lantern build engine, v${version}${RS}";
+	echo -e "";
+	echo -e "${CSECTION}Usage${RS}";
+	echo -e "    shunction ${CTOKEN}{action}${RS} {options}";
+	echo -e "    shunction ${CTOKEN}--help${RS}";
+	echo -e "";
+	echo -e "${CSECTION}Actions${RS}";
+	echo -e "";
+	echo -e "";
+	echo -e "${CSECTION}Options${RS}";
+	echo -e "    ${CTOKEN}-c  --config    Specify the configuration file location";
+	echo -e "";
+}
+
+###############################################################################
+
+# TODO: Parse CLI arguments here
+# We probably want to port the C# paradigm we've been using to bash.
+
+# Array cheat sheet
+# Append		rockets+=("${item}")
+# Get length	${#rockets[@]}
+# Get item		${rockets[${var_name}]}
+
+while [[ "${#@}" -gt 0 ]]; do
+	next="${1}";
+	echo -e "${LC}[CLI] Parsing ${next}${RS}";
+	
+	if [[ "${next}" != -* ]]; then # It doesn't start with a dash
+		# echo -e "${LC}[CLI] Doesn't start with a dash";
+		extras+=("${next}");
+		shift;
+		continue;
+	fi
+	
+	case "${next}" in
+		"--help" )
+			tasks_run help;
+			exit 1;
+			;;
+		
+		
+		"--config" )
+			shift;
+			config_file="${1}";
+			;;
+			
+		*)
+			echo -e "${FRED}${HC}Error: Unknown argument ${next}${RS}";
+			exit 2;
+			;;
+	esac
+	
+	shift
+done
+
+if [[ "${#extras[@]}" -lt 1 ]]; then
+	tasks_run help;
+	exit 1;
+fi
+
+echo -e "${LC}[CLI] Action: ${extras[0]}${RS}";
+#tasks_run $1;
+
+tasks_run "${extras[0]}";
