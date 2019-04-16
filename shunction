@@ -16,7 +16,7 @@ lantern_path="lantern-build-engine";
 ###
 
 config_file="./shunction-settings.sh";
-jobs_folder="./jobs";
+functions_folder="./functions";
 
 ###############################################################################
 
@@ -34,6 +34,11 @@ parse_time() {
 	echo "$1" | tr 'ms' '\t' | awk '{ print(($1*60)+$2) }';
 }
 
+# $1 - function name
+get_function_filepath() {
+	echo "${functions_folder}/${1}.func";
+}
+
 ###############################################################################
 
 task_help() {
@@ -46,7 +51,10 @@ task_help() {
 	echo -e "    shunction ${CTOKEN}--help${RS}";
 	echo -e "";
 	echo -e "${CSECTION}Actions${RS}";
-	echo -e "    ${CACTION}trigger${RS} ${CTOKEN}{adhoc|cron} {job_name}";
+	echo -e "    ${CACTION}trigger${RS} ${CTOKEN}{adhoc|cron} {function_name}${RS}";
+	echo -e "        ${LC}Trigger a function${RS}";
+	echo -e "    ${CACTION}inotify${RS} ${CTOKEN}{path to file or dir} {function_name}${RS}";
+	echo -e "        ${LC}Watch a file or directory, and trigger a function on change${RS}";
 	echo -e "";
 	echo -e "${CSECTION}Options${RS}";
 	echo -e "    ${CTOKEN}-c  --config    Specify the configuration file location";
@@ -55,39 +63,42 @@ task_help() {
 
 task_trigger() {
 	trigger_type="${extras[1]}"; # adhoc, cron[, inotify, http]
-	job_name="${extras[2]}";
+	function_name="${extras[2]}";
 	
-	echo "type ${trigger_type} / job ${job_name}";
 	if [[ "${trigger_type}" == "" ]]; then
 		echo -e "${FRED}${HC}Error: No trigger type specified.${RS}";
 		echo -e "${CSECTION}Actions${RS}";
-		echo -e "    ${CTOKEN}adhoc${RS}      Triggered via cron";
+		echo -e "    ${CTOKEN}adhoc${RS}      Triggered manually";
 		echo -e "    ${CTOKEN}cron${RS}       Triggered via cron";
 		echo -e "    ${CTOKEN}inotify${RS}    Triggered via inotify";
 		echo -e "    ${CTOKEN}http${RS}       Triggered via http";
 		exit 3;
-	elif [[ "${job_name}" == "" ]]; then
-		echo -e "${FRED}${HC}Error: No job name specified.";
+	elif [[ "${function_name}" == "" ]]; then
+		echo -e "${FRED}${HC}Error: No function name specified.";
 		exit 7;
 	fi
 	
-	job_filename="${jobs_folder}/${job_name}.job";
+	function_filename="$(get_function_filepath "${function_name}")";
 	
-	if [[ ! -f "${job_filename}" ]]; then
-		echo -e "${FRED}${HC}Error: '${job_filename}' doesn't exist.${RS}";
+	if [[ ! -f "${function_filename}" ]]; then
+		echo -e "${FRED}${HC}Error: '${function_filename}' doesn't exist.${RS}";
 		exit 5;
-	elif [[ ! -x "${job_filename}" ]]; then
-		echo -e "${FRED}${HC}Error: '${job_filename}' exists, but isn't executable.${RS}";
+	elif [[ ! -x "${function_filename}" ]]; then
+		echo -e "${FRED}${HC}Error: '${function_filename}' exists, but isn't executable.${RS}";
 		exit 4;
 	fi
 	
 	#######################################################
 	
-	export STN_TIGGER_TYPE="${trigger_type}";
+	tmpfile="$(mktemp -p /dev/shm/ -t shunction.XXXXXXXXX.stdout.tmp)";
+	
+	export STN_TRIGGER_TYPE="${trigger_type}";
+	export STN_FUNCTION_NAME="${function_name}";
 	
 	# start_time="$(date +%s.%N)";
-	raw_cputime="$(time ( "${job_filename}" ) 2>&1 1>/dev/null)";
+	raw_cputime="$(time ( "${function_filename}" >"${tmpfile}" 2>&1 ) 2>&1 1>/dev/null)";
 	exit_code="$?";
+	raw_cputime="$(echo "${raw_cputime}" | tr '\n' '\t')";
 	# end_time="$(date +%s.%N)";
 	
 	time_taken_real="$(parse_time "$(echo "${raw_cputime}" | awk '{ print $2 }')")";
@@ -98,17 +109,55 @@ task_trigger() {
 	
 	#######################################################
 	
-	echo -e "[trigger] Executed ${HC}${job_name}${RS} in ${HC}${time_taken_real}${RS}s / (cpu: ${HC}${time_taken_user}${RS}s user, ${HC}${time_taken_kern}${RS}s kernel).";
+	if [[ "$(cat "${tmpfile}" | wc -l)" -gt 1 ]]; then
+		stage_begin "${function_name} output";
+		cat "${tmpfile}";
+		stage_end 0;
+	else
+		echo -e "${LC}[trigger] Output:${RS} $(cat "${tmpfile}")";
+	fi
 	
-	#logger --tag "shunction" --id=$$ "Executed ${job_name} in ${time_taken}ms";
+	rm "${tmpfile}";
+	
+	
+	echo -e "[trigger] Executed ${HC}${function_name}${RS} in ${HC}${time_taken_real}${RS}s / (cpu: ${HC}${time_taken_user}${RS}s user, ${HC}${time_taken_kern}${RS}s kernel).";
+	
+	#logger --tag "shunction" --id=$$ "Executed ${function_name} in ${time_taken}ms";
+}
+
+task_inotify() {
+	path="${extras[1]}";
+	function_name="${extras[2]}";
+	
+	if [[ "${path}" == "" ]]; then
+		echo -e "${FRED}${HC}Error: No file or directory specified.${RS}";
+		exit 8;
+	elif [[ "${function_name}" == "" ]]; then
+		echo -e "${FRED}${HC}Error: No function name specified.";
+		exit 9;
+	fi
+	
+	# Update the function running parameters ready for running the trigger task
+	# TODO: Refactor task_trigger to pull out the extras into environment variables instead
+	extras[1]="inotify";
+	extras[2]="${function_name}";
+	
+	while :; do # : = infinite loop
+		# Wait for an update
+		# inotifywait's non-0 exit code forces an exit for some reason :-/
+		raw_inotify="$(inotifywait -qr -e modify -e attrib -e close_write -e move -e create -e delete -e delete_self -e unmount -e move_self --format '%:e %f' "${path}")";
+		
+		event_type="$(echo "${raw_inotify}" | cut -d' ' -f1)";
+		filename="$(echo "${raw_inotify}" | cut -d' ' -f2-)";
+		
+		# Push the trigger into the background so that we get back to listening via inotify asap
+		tasks_run "trigger" &
+	done
 }
 
 ###############################################################################
 
-# TODO: Parse CLI arguments here
-# We probably want to port the C# paradigm we've been using to bash.
-
-# Array cheat sheet
+# Bash array cheat sheet
 # Append		rockets+=("${item}")
 # Get length	${#rockets[@]}
 # Get item		${rockets[${var_name}]}
