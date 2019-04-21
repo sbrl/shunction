@@ -15,7 +15,7 @@ lantern_path="lantern-build-engine";
 # Custom Settings
 ###
 
-config_file="./shunction-settings.sh";
+config_file=""; # Empty string - don't bother
 functions_folder="./functions";
 
 ###############################################################################
@@ -202,11 +202,14 @@ fi
 #echo -e "${LC}[CLI] Action: ${extras[0]}${RS}";
 #tasks_run $1;
 
-if [[ ! -f "${config_file}" ]]; then
+# If a config file is specified but doesn't exist, then throw an error
+if [[ "${config_file}" != "" ]] && [[ ! -f "${config_file}" ]]; then
 	echo -e "${FRED}${HC}Error: Failed to find config file at '${config_file}'.${RS}";
 	exit 6;
 fi
 
-source "${config_file}";
+if [[ "${config_file}" != "" ]]; then
+	source "${config_file}";
+fi
 
 tasks_run "${extras[0]}";

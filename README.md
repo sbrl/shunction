@@ -13,3 +13,5 @@ Simply clone this repository like this:
 git clone git@github.com:sbrl/shunction.git
 cd shunction;
 ```
+
+and then 
