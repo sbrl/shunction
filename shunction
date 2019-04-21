@@ -20,6 +20,12 @@ functions_folder="./functions";
 
 ###############################################################################
 
+cmd_netcat="netcat";
+# If netcat isn't installed, try the nc alias instead
+! which netcat >/dev/null 2>&1 && cmd_netcat="nc";
+
+###############################################################################
+
 # Check out the lantern git submodule if needed
 if [ ! -f "${lantern_path}/lantern.sh" ]; then git submodule update --init "${lantern_path}"; fi
 
@@ -55,6 +61,8 @@ task_help() {
 	echo -e "        ${LC}Trigger a function${RS}";
 	echo -e "    ${CACTION}inotify${RS} ${CTOKEN}{path to file or dir} {function_name}${RS}";
 	echo -e "        ${LC}Watch a file or directory, and trigger a function on change${RS}";
+	echo -e "    ${CACTION}http${RS} ${CTOKEN}{bind_address} {port}${RS}";
+	echo -e "        ${LC}Listen on the specified address and port number for http GET requests (e.g. /${CTOKEN}{function_name}${RS}${LC})${RS}";
 	echo -e "";
 	echo -e "${CSECTION}Options${RS}";
 	echo -e "    ${CTOKEN}-c  --config    Specify the configuration file location";
@@ -74,7 +82,7 @@ task_trigger() {
 		echo -e "    ${CTOKEN}http${RS}       Triggered via http";
 		exit 3;
 	elif [[ "${function_name}" == "" ]]; then
-		echo -e "${FRED}${HC}Error: No function name specified.";
+		echo -e "${FRED}${HC}Error: No function name specified.${RS}";
 		exit 7;
 	fi
 	
@@ -133,9 +141,11 @@ task_inotify() {
 		echo -e "${FRED}${HC}Error: No file or directory specified.${RS}";
 		exit 8;
 	elif [[ "${function_name}" == "" ]]; then
-		echo -e "${FRED}${HC}Error: No function name specified.";
+		echo -e "${FRED}${HC}Error: No function name specified.${RS}";
 		exit 9;
 	fi
+	
+	echo -e "[inotify] Watching ${HC}${path}${RS} and executing ${HC}${function_name}${RS}";
 	
 	# Update the function running parameters ready for running the trigger task
 	# TODO: Refactor task_trigger to pull out the extras into environment variables instead
@@ -152,6 +162,37 @@ task_inotify() {
 		
 		# Push the trigger into the background so that we get back to listening via inotify asap
 		tasks_run "trigger" &
+	done
+}
+
+###############################################################################
+
+# $1	Temporary file containing the request
+http_handle() {
+	cat "${1}";
+}
+
+task_http() {
+	bind_address="${extras[1]}";
+	port="${extras[2]}";
+	
+	if [[ "${bind_address}" == "" ]]; then
+		echo -e "${FRED}${HC}Error: No bind address specified. Examples: 127.0.0.1, 0.0.0.0 (careful, this last one might be dangerous!)${RS}";
+		exit 10;
+	fi
+	if [[ "${port}" == "" ]]; then
+		echo -e "${FRED}${HC}Error: No port number specified.${RS}";
+		exit 11;
+	fi
+	
+	echo -e "[http] Listening on $(display_url "http://${bind_address}:${port}/" "http://${HC}${bind_address}${RS}:${HC}${port}${RS}").";
+	
+	while true; do
+		tmpfile="$(mktemp -p /dev/shm/ -t shunction.XXXXXXXXX.http-req.tmp)";
+		"${cmd_netcat}" -l "${bind_address}" "${port}" >"${tmpfile}";
+		
+		http_handle "${tmpfile}";
+		rm "${tmpfile}";
 	done
 }
 
