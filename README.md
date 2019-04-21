@@ -10,6 +10,6 @@ In short, _shunction_ given a folder of function scripts, provides various mecha
 Simply clone this repository like this:
 
 ```bash
-git clone git@
+git clone git@github.com:sbrl/shunction.git
 cd shunction;
 ```
