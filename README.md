@@ -24,6 +24,7 @@ Functions are, by default, looked for in `./functions`. A function file can be a
 
 
 ## CLI Arguments
+Extra CLI arguments are supported:
 
 Argument		| Short form	| Meaning
 ----------------|---------------|--------------------
