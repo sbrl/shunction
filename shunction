@@ -209,7 +209,12 @@ http_handle() {
 	fi
 	
 	http_make_response_header "200 OK";
-	echo "Hello, world!";
+	
+	# Sub the values in to the correct places
+	extras[1]="http";
+	extras[2]="${http_function_name}";
+	# Execute the command
+	tasks_run "trigger" | tee /dev/stderr;
 }
 
 task_http() {
