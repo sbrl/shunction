@@ -167,9 +167,49 @@ task_inotify() {
 
 ###############################################################################
 
-# $1	Temporary file containing the request
+# $1	Response code & description
+# [$2	Any additional headers]
+http_make_response_header() {
+	echo "HTTP/1.1 ${1}";
+	echo "Server: ${project_name}";
+	echo "Connection: close";
+	[[ "${2}" != "" ]] && echo "${2}";
+	echo "";
+}
+
+# $1	Remote endpoint
+# $2	Function name
+# $3	Response code
+http_make_log_message() {
+	echo -e "[http/handle] [${FBLE}$(date)${RS}] [${FYEL}${3}${RS}] ${FGRN}${remote_address}${RS} ${FMAG}${http_function_name}${RS}";
+}
+
 http_handle() {
-	cat "${1}";
+	# Read the first line that we've been sent - we don't actually care about the rest
+	read -r http_verb http_path http_version;
+	# FUTURE: Consider handling authorization header here
+	
+	remote_address="$(netstat -peanutl 2>/dev/null | grep -i "ESTABLISHED.*${cmd_netcat}" | awk '{ print $5 }')";
+	
+	# Strip the query string, dots, and all forward slashes to get the function name
+	http_function_name="$(echo "${http_path}" | grep -oP '[^/.?: ]+' | head -n1)";
+	
+	http_make_log_message "${remote_address}" "${http_function_name}" "200 OK" >&2;
+	
+	if [[ "${http_verb}" != "GET" ]]; then
+		http_make_response_header "405 Method Not Supported";
+		echo "Only GET requests are supported.";
+		return;
+	fi
+	
+	if [[ ! -f "$(get_function_filepath "${http_function_name}")" ]]; then
+		http_make_response_header "404 Not Found";
+		echo "The function '${http_function_name}' doesn't exist";
+		return;
+	fi
+	
+	http_make_response_header "200 OK";
+	echo "Hello, world!";
 }
 
 task_http() {
@@ -188,11 +228,12 @@ task_http() {
 	echo -e "[http] Listening on $(display_url "http://${bind_address}:${port}/" "http://${HC}${bind_address}${RS}:${HC}${port}${RS}").";
 	
 	while true; do
-		tmpfile="$(mktemp -p /dev/shm/ -t shunction.XXXXXXXXX.http-req.tmp)";
-		"${cmd_netcat}" -l "${bind_address}" "${port}" >"${tmpfile}";
+		tmp_request="$(mktemp -p /dev/shm/ -t shunction.XXXXXXXXX.http-req.tmp)";
+		rm "${tmp_request}"; mkfifo "${tmp_request}";
 		
-		http_handle "${tmpfile}";
-		rm "${tmpfile}";
+		http_handle <"${tmp_request}" | "${cmd_netcat}" -l "${bind_address}" "${port}" >"${tmp_request}";
+		
+		rm "${tmp_request}";
 	done
 }
 
