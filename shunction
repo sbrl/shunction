@@ -70,8 +70,8 @@ task_help() {
 }
 
 task_trigger() {
-	trigger_type="${extras[1]}"; # adhoc, cron[, inotify, http]
-	function_name="${extras[2]}";
+	local trigger_type="${extras[1]}"; # adhoc, cron[, inotify, http]
+	local function_name="${extras[2]}";
 	
 	if [[ "${trigger_type}" == "" ]]; then
 		echo -e "${FRED}${HC}Error: No trigger type specified.${RS}";
@@ -86,7 +86,7 @@ task_trigger() {
 		exit 7;
 	fi
 	
-	function_filename="$(get_function_filepath "${function_name}")";
+	local function_filename="$(get_function_filepath "${function_name}")";
 	
 	if [[ ! -f "${function_filename}" ]]; then
 		echo -e "${FRED}${HC}Error: '${function_filename}' doesn't exist.${RS}";
@@ -98,20 +98,20 @@ task_trigger() {
 	
 	#######################################################
 	
-	tmpfile="$(mktemp -p /dev/shm/ -t shunction.XXXXXXXXX.stdout.tmp)";
+	local tmpfile="$(mktemp -p /dev/shm/ -t shunction.XXXXXXXXX.stdout.tmp)";
 	
 	export STN_TRIGGER_TYPE="${trigger_type}";
 	export STN_FUNCTION_NAME="${function_name}";
 	
 	# start_time="$(date +%s.%N)";
-	raw_cputime="$(time ( "${function_filename}" >"${tmpfile}" 2>&1 ) 2>&1 1>/dev/null)";
-	exit_code="$?";
-	raw_cputime="$(echo "${raw_cputime}" | tr '\n' '\t')";
+	local raw_cputime="$(time ( "${function_filename}" >"${tmpfile}" 2>&1 ) 2>&1 1>/dev/null)";
+	local exit_code="$?";
+	local raw_cputime="$(echo "${raw_cputime}" | tr '\n' '\t')";
 	# end_time="$(date +%s.%N)";
 	
-	time_taken_real="$(parse_time "$(echo "${raw_cputime}" | awk '{ print $2 }')")";
-	time_taken_user="$(parse_time "$(echo "${raw_cputime}" | awk '{ print $4 }')")";
-	time_taken_kern="$(parse_time "$(echo "${raw_cputime}" | awk '{ print $6 }')")";
+	local time_taken_real="$(parse_time "$(echo "${raw_cputime}" | awk '{ print $2 }')")";
+	local time_taken_user="$(parse_time "$(echo "${raw_cputime}" | awk '{ print $4 }')")";
+	local time_taken_kern="$(parse_time "$(echo "${raw_cputime}" | awk '{ print $6 }')")";
 	
 	# time_taken="$(echo "${end_time} - ${start_time}" | bc)";
 	
@@ -128,14 +128,14 @@ task_trigger() {
 	rm "${tmpfile}";
 	
 	
-	echo -e "[trigger] Executed ${HC}${function_name}${RS} in ${HC}${time_taken_real}${RS}s / (cpu: ${HC}${time_taken_user}${RS}s user, ${HC}${time_taken_kern}${RS}s kernel).";
+	echo -e "[trigger] Executed ${HC}${function_name}${RS} in ${HC}${time_taken_real}${RS}s (cpu: ${HC}${time_taken_user}${RS}s user, ${HC}${time_taken_kern}${RS}s kernel).";
 	
 	#logger --tag "shunction" --id=$$ "Executed ${function_name} in ${time_taken}ms";
 }
 
 task_inotify() {
-	path="${extras[1]}";
-	function_name="${extras[2]}";
+	local path="${extras[1]}";
+	local function_name="${extras[2]}";
 	
 	if [[ "${path}" == "" ]]; then
 		echo -e "${FRED}${HC}Error: No file or directory specified.${RS}";
@@ -184,15 +184,24 @@ http_make_log_message() {
 	echo -e "[http/handle] [${FBLE}$(date)${RS}] [${FYEL}${3}${RS}] ${FGRN}${remote_address}${RS} ${FMAG}${http_function_name}${RS}";
 }
 
+ansi_filter() {
+	shopt -s extglob; # Enable Bash extended globbing expressions
+	local line
+	local IFS=
+	while read -r line || [[ "$line" ]]; do
+		echo "${line//$'\e'[\[(]*([0-9;])[@-n]/}";
+	done
+}
+
 http_handle() {
 	# Read the first line that we've been sent - we don't actually care about the rest
 	read -r http_verb http_path http_version;
 	# FUTURE: Consider handling authorization header here
 	
-	remote_address="$(netstat -peanutl 2>/dev/null | grep -i "ESTABLISHED.*${cmd_netcat}" | awk '{ print $5 }')";
+	local remote_address="$(netstat -peanutl 2>/dev/null | grep -i "ESTABLISHED.*${cmd_netcat}" | awk '{ print $5 }')";
 	
 	# Strip the query string, dots, and all forward slashes to get the function name
-	http_function_name="$(echo "${http_path}" | grep -oP '[^/.?: ]+' | head -n1)";
+	local http_function_name="$(echo "${http_path}" | grep -oP '[^/.?: ]+' | head -n1)";
 	
 	http_make_log_message "${remote_address}" "${http_function_name}" "200 OK" >&2;
 	
@@ -214,7 +223,7 @@ http_handle() {
 	extras[1]="http";
 	extras[2]="${http_function_name}";
 	# Execute the command
-	tasks_run "trigger" | tee /dev/stderr;
+	tasks_run "trigger" | tee /dev/stderr | ansi_filter;
 }
 
 task_http() {
