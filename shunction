@@ -184,6 +184,8 @@ http_make_log_message() {
 	echo -e "[http/handle] [${FBLE}$(date)${RS}] [${FYEL}${3}${RS}] ${FGRN}${remote_address}${RS} ${FMAG}${http_function_name}${RS}";
 }
 
+# From https://stackoverflow.com/a/54766117/1460422
+# FUTURE: Consider merging this into lantern
 ansi_filter() {
 	shopt -s extglob; # Enable Bash extended globbing expressions
 	local line
