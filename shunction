@@ -17,6 +17,7 @@ lantern_path="lantern-build-engine";
 
 config_file=""; # Empty string - don't bother
 functions_folder="./functions";
+strip_ansi=false;
 
 ###############################################################################
 
@@ -186,17 +187,6 @@ http_make_log_message() {
 	echo -e "[http/handle] [${FBLE}$(date)${RS}] [${FYEL}${3}${RS}] ${FGRN}${remote_address}${RS} ${FMAG}${http_function_name}${RS}";
 }
 
-# From https://stackoverflow.com/a/54766117/1460422
-# FUTURE: Consider merging this into lantern
-ansi_filter() {
-	shopt -s extglob; # Enable Bash extended globbing expressions
-	local line
-	local IFS=
-	while read -r line || [[ "$line" ]]; do
-		echo "${line//$'\e'[\[(]*([0-9;])[@-n]/}";
-	done
-}
-
 http_handle() {
 	# Read the first line that we've been sent - we don't actually care about the rest
 	read -r http_verb http_path http_version;
@@ -227,7 +217,7 @@ http_handle() {
 	extras[1]="http";
 	extras[2]="${http_function_name}";
 	# Execute the command
-	tasks_run "trigger" | tee /dev/stderr | ansi_filter;
+	tasks_run "trigger" | tee /dev/stderr | ansi_strip;
 }
 
 task_http() {
@@ -284,6 +274,10 @@ while [[ "${#@}" -gt 0 ]]; do
 			shift;
 			config_file="${1}";
 			;;
+		
+		"--strip-ansi" )
+			strip_ansi=true;
+			;;
 			
 		*)
 			echo -e "${FRED}${HC}Error: Unknown argument ${next}${RS}";
@@ -294,22 +288,32 @@ while [[ "${#@}" -gt 0 ]]; do
 	shift
 done
 
-if [[ "${#extras[@]}" -lt 1 ]]; then
-	tasks_run help;
-	exit 1;
+main() {
+	if [[ "${#extras[@]}" -lt 1 ]]; then
+		tasks_run help;
+		exit 1;
+	fi
+	
+	#echo -e "${LC}[CLI] Action: ${extras[0]}${RS}";
+	#tasks_run $1;
+	
+	# If a config file is specified but doesn't exist, then throw an error
+	if [[ "${config_file}" != "" ]] && [[ ! -f "${config_file}" ]]; then
+		echo -e "${FRED}${HC}Error: Failed to find config file at '${config_file}'.${RS}";
+		exit 6;
+	fi
+	
+	if [[ "${config_file}" != "" ]]; then
+		source "${config_file}";
+	fi
+	
+	tasks_run "${extras[0]}";
+}
+
+if [[ "${strip_ansi}" == "false" ]]; then
+	main;
+elif [[ "${strip_ansi}" == "true" ]]; then
+	main | ansi_strip;
+else
+	echo "${HC}${FRED}Error: Unknown value '${strip_ansi}' for 'strip_ansi' configuration directive.${RS}";
 fi
-
-#echo -e "${LC}[CLI] Action: ${extras[0]}${RS}";
-#tasks_run $1;
-
-# If a config file is specified but doesn't exist, then throw an error
-if [[ "${config_file}" != "" ]] && [[ ! -f "${config_file}" ]]; then
-	echo -e "${FRED}${HC}Error: Failed to find config file at '${config_file}'.${RS}";
-	exit 6;
-fi
-
-if [[ "${config_file}" != "" ]]; then
-	source "${config_file}";
-fi
-
-tasks_run "${extras[0]}";

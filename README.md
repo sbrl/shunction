@@ -29,6 +29,7 @@ Extra CLI arguments are supported:
 Argument		| Short form	| Meaning
 ----------------|---------------|--------------------
 `--config`		| `-c`			| Specify the location of a configuration file to load
+`--strip-ansi`	| none			| Strip all ANSI escape codes from the output. Useful for sending the output to a log file etc.
 
 
 ## Configuration
@@ -44,6 +45,7 @@ functions_folder="path/to/directory";
 Directive			| Default Value	| Meaning
 --------------------|---------------|------------------------------------------
 `functions_folder`	| `./functions`	| The location of the directory in which to find functions to execute
+`strip_ansi`		| `false`		| Whether to strip all ANSI escape codes from the output. Useful for sending the output to a log file.
 
 ## Usage
 Shunction supports 4 modes of operation: ad-hoc, cron, inotify, and http.
