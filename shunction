@@ -280,7 +280,7 @@ while [[ "${#@}" -gt 0 ]]; do
 			;;
 		
 		
-		"--config" )
+		"--config" | "-c" )
 			shift;
 			config_file="${1}";
 			;;
