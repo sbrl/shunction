@@ -1,8 +1,8 @@
 # shunction (Work-in-Progress! :building_construction: :construction:)
 
-> :fuelpump: Self-hosted [Azure Functions](https://docs.microsoft.com/en-us/azure/azure-functions/) ftw!
+> :fuelpump: Self-hosted [Azure Functions](https://docs.microsoft.com/en-us/azure/azure-functions/) ftw! (Parody)
 
-shunction (SHell Function) is a parody of _Azure Functions_. When I first heard of Azure Functions, I knew I had to write this.
+Shunction (SHell Function) is a parody of _Azure Functions_. When I first heard of Azure Functions, I knew I had to write this.
 
 In short, _shunction_ given a folder of function scripts, provides various mechanisms by which they can be triggered.
 
