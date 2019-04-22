@@ -44,3 +44,45 @@ functions_folder="path/to/directory";
 Directive			| Default Value	| Meaning
 --------------------|---------------|------------------------------------------
 `functions_folder`	| `./functions`	| The location of the directory in which to find functions to execute
+
+## Usage
+Shunction supports 4 modes of operation: ad-hoc, cron, inotify, and http.
+
+### Ad-hoc
+For one-off runs, use _ad-hoc_ mode.
+
+```bash
+./shunction trigger adhoc function_name
+```
+
+### Cron
+Regularly-repeating jobs can be invoked by editing your crontab with `crontab -e`. Paste in something like this:
+
+```bash
+5 4 * * *	/absolute/path/to/shunction trigger cron function_name
+```
+
+This website is really useful for generating crontab definitions: <https://crontab.guru/>.
+
+<!-- TODO: Add CLI argument to disable colour output and add pipe-to-file example here -->
+
+### Inotify
+The inotify mode allows you to run jobs when something changes on disk. The `inotifywait` command is required. Shunction will automatically watch subdirectories for you.
+
+Use it like this:
+
+```bash
+./shunction inotify "path/to/file/or/directory" "function_name"
+```
+
+It will stick around until it is killed. Note that it will run the function once for _every_ event detected in the background and start listening for additional jobs immediately, so if you need to ensure only 1 instance of your program is running, try looking at [this StackOverflow answer](https://stackoverflow.com/a/1985512/1460422).
+
+### Http
+Finally, shunction supports listening over HTTP, though it's not advised to listen on anything more than localhost. Unlike inotify, http mode supports execution of multiple different functions, though only 1 at a time.
+
+```bash
+./shunction http bind_address port_number
+./shunction http 127.0.0.1 7777
+```
+
+Note that regular Linux rules still apply - if you want to listen on port numbers below 1024, shunction either needs to run as root (bad idea!), or you need to tell Linux that it's allowed to like this: `setcap 'cap_net_bind_service=+ep' path/to/shunction`.

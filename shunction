@@ -137,6 +137,8 @@ task_inotify() {
 	local path="${extras[1]}";
 	local function_name="${extras[2]}";
 	
+	check_command inotifywait; # Make sure inotifywait is available
+	
 	if [[ "${path}" == "" ]]; then
 		echo -e "${FRED}${HC}Error: No file or directory specified.${RS}";
 		exit 8;
