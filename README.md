@@ -1,4 +1,4 @@
-# shunction (Work-in-Progress! :building_construction: :construction:)
+# shunction
 
 > :fuelpump: Self-hosted [Azure Functions](https://docs.microsoft.com/en-us/azure/azure-functions/) ftw! (Parody)
 
